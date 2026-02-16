@@ -1,0 +1,13 @@
+gradle-wrapper.jar
+/.gradle
+/captures/
+/gradlew
+/gradlew.bat
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# Keystore y key.properties incluidos en repo privado (respaldo).
+# key.properties
+# **/*.keystore
+# **/*.jks

@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "persons",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "grupo", "order": "ASCENDING" },
+        { "fieldPath": "nombreApellidos", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
