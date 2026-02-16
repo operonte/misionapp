@@ -33,6 +33,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
   late String enfermedadCronica;
   late int nivelComplejidad;
   late String grupo;
+  late String comentarios;
 
   @override
   void initState() {
@@ -48,10 +49,11 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
     esCristianoOAsisteIglesia = 'No';
     quiereRecibirVisitas = 'Sí';
     vicios = [];
-    enfermedadMental = '';
-    enfermedadCronica = '';
+    enfermedadMental = mentalHealthOptions.first;
+    enfermedadCronica = chronicIllnessOptions.first;
     nivelComplejidad = 1;
-    grupo = profile?.grupo ?? missionGroups.first;
+    grupo = profile?.grupo ?? '';
+    comentarios = '';
     if (_isEdit) _loadPerson();
   }
 
@@ -68,10 +70,15 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
         esCristianoOAsisteIglesia = p.esCristianoOAsisteIglesia;
         quiereRecibirVisitas = p.quiereRecibirVisitas;
         vicios = List.from(p.vicios);
-        enfermedadMental = p.enfermedadMental;
-        enfermedadCronica = p.enfermedadCronica;
+        enfermedadMental = mentalHealthOptions.contains(p.enfermedadMental)
+            ? p.enfermedadMental
+            : mentalHealthOptions.first;
+        enfermedadCronica = chronicIllnessOptions.contains(p.enfermedadCronica)
+            ? p.enfermedadCronica
+            : chronicIllnessOptions.first;
         nivelComplejidad = p.nivelComplejidad;
         grupo = p.grupo;
+        comentarios = p.comentarios;
       });
     }
   }
@@ -81,8 +88,8 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
     setState(() => _loading = true);
     try {
       final person = Person(
-        id: widget.personId ?? '', // vacío para nueva; id real para editar
-        grupo: grupo,
+        id: widget.personId ?? '',
+        grupo: grupo.trim(),
         nombreApellidos: nombreApellidos.trim(),
         direccion: direccion.trim(),
         telefono: telefono.trim(),
@@ -95,6 +102,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
         enfermedadMental: enfermedadMental.trim(),
         enfermedadCronica: enfermedadCronica.trim(),
         nivelComplejidad: nivelComplejidad,
+        comentarios: comentarios.trim(),
       );
       if (_isEdit) {
         await _firestore.updatePerson(person);
@@ -109,6 +117,18 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_isEdit ? 'Actualizado' : 'Persona agregada')),
+        );
+      }
+    } catch (e, st) {
+      debugPrint('Error al guardar persona: $e');
+      debugPrint('$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {
@@ -219,11 +239,9 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                   _viciosField(),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: enfermedadMental.isEmpty
-                        ? mentalHealthOptions.first
-                        : (mentalHealthOptions.contains(enfermedadMental)
-                            ? enfermedadMental
-                            : mentalHealthOptions.first),
+                    value: mentalHealthOptions.contains(enfermedadMental)
+                        ? enfermedadMental
+                        : mentalHealthOptions.first,
                     decoration: const InputDecoration(
                       labelText: 'Enfermedad mental declarada',
                       border: OutlineInputBorder(),
@@ -236,11 +254,9 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: enfermedadCronica.isEmpty
-                        ? chronicIllnessOptions.first
-                        : (chronicIllnessOptions.contains(enfermedadCronica)
-                            ? enfermedadCronica
-                            : chronicIllnessOptions.first),
+                    value: chronicIllnessOptions.contains(enfermedadCronica)
+                        ? enfermedadCronica
+                        : chronicIllnessOptions.first,
                     decoration: const InputDecoration(
                       labelText: 'Enfermedad crónica',
                       border: OutlineInputBorder(),
@@ -270,14 +286,28 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: grupo,
+                  TextFormField(
+                    initialValue: grupo,
                     decoration: const InputDecoration(
-                        labelText: 'Grupo', border: OutlineInputBorder()),
-                    items: missionGroups
-                        .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-                        .toList(),
-                    onChanged: (v) => setState(() => grupo = v ?? grupo),
+                      labelText: 'Grupo de misión',
+                      hintText: 'Escribe el nombre del grupo',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => grupo = v,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: comentarios,
+                    decoration: const InputDecoration(
+                      labelText: 'Comentarios',
+                      hintText: 'Notas adicionales (opcional)',
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                    ),
+                    maxLines: 4,
+                    onChanged: (v) => comentarios = v,
                   ),
                   const SizedBox(height: 24),
                   FilledButton(

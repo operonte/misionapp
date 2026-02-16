@@ -3,7 +3,6 @@ import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/person.dart';
-import '../models/visit.dart';
 import 'firestore_service.dart';
 
 class ExportService {
@@ -32,6 +31,7 @@ class ExportService {
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: 0)).value = TextCellValue('Enfermedad crónica');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: 0)).value = TextCellValue('Complejidad');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: 0)).value = TextCellValue('Grupo');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: 0)).value = TextCellValue('Comentarios');
     for (var v = 0; v < maxVisits; v++) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: 0)).value = TextCellValue('Visita ${v + 1} Fecha');
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: 0)).value = TextCellValue('Visita ${v + 1} Contenido');
@@ -55,6 +55,7 @@ class ExportService {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: row)).value = TextCellValue(p.enfermedadCronica);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: row)).value = TextCellValue('${p.nivelComplejidad}');
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: row)).value = TextCellValue(p.grupo);
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: col++, rowIndex: row)).value = TextCellValue(p.comentarios);
       for (var v = 0; v < maxVisits; v++) {
         if (v < visits.length) {
           final visit = visits[v];

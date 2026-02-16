@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../app_state.dart';
 import '../services/auth_service.dart';
-import '../services/storage_service.dart';
 import '../services/firestore_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -25,6 +23,13 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _resolve() async {
     await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
+    final onboardingDone = await appStorage.isOnboardingDone();
+    if (!mounted) return;
+    // Primera vez: mostrar las 5 pantallas de bienvenida antes de login.
+    if (!onboardingDone) {
+      context.go('/onboarding');
+      return;
+    }
     final user = _auth.currentUser;
     if (user == null) {
       context.go('/login');
@@ -32,13 +37,8 @@ class _SplashScreenState extends State<SplashScreen> {
     }
     final profile = await FirestoreService().getUserProfile(user.uid);
     if (profile != null && mounted) currentUserProfile = profile;
-    final onboardingDone = await appStorage.isOnboardingDone();
     if (!mounted) return;
-    if (onboardingDone) {
-      context.go('/home');
-    } else {
-      context.go('/onboarding');
-    }
+    context.go('/home');
   }
 
   @override

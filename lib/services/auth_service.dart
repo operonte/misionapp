@@ -10,8 +10,14 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  /// Web client ID (client_type 3) de Firebase; necesario en Android para que Firebase Auth acepte el idToken.
+  static const String _webClientId =
+      '700679867705-821sob8r4v0k5p0vhjkojesapklu6t6f.apps.googleusercontent.com';
+
   Future<User?> signInWithGoogle() async {
-    final googleSignIn = GoogleSignIn();
+    final googleSignIn = GoogleSignIn(
+      serverClientId: _webClientId,
+    );
     final googleUser = await googleSignIn.signIn();
     if (googleUser == null) return null;
 
@@ -25,7 +31,7 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    await GoogleSignIn().signOut();
+    await GoogleSignIn(serverClientId: _webClientId).signOut();
     await _auth.signOut();
   }
 

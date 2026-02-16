@@ -33,6 +33,7 @@ const List<String> viceOptions = [
 
 /// Opciones enfermedad mental (comunes).
 const List<String> mentalHealthOptions = [
+  'Sano',
   'Estrés',
   'Ansiedad',
   'Depresión',
@@ -41,6 +42,7 @@ const List<String> mentalHealthOptions = [
 
 /// Opciones enfermedad crónica (comunes).
 const List<String> chronicIllnessOptions = [
+  'Sano',
   'Diabetes',
   'Hipertensión',
   'Cardiopatía',

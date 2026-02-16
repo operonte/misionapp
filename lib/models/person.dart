@@ -15,6 +15,7 @@ class Person {
   final String enfermedadMental;
   final String enfermedadCronica;
   final int nivelComplejidad;
+  final String comentarios;
 
   const Person({
     required this.id,
@@ -31,6 +32,7 @@ class Person {
     required this.enfermedadMental,
     required this.enfermedadCronica,
     required this.nivelComplejidad,
+    required this.comentarios,
   });
 
   Map<String, dynamic> toMap() => {
@@ -47,6 +49,7 @@ class Person {
         'enfermedadMental': enfermedadMental,
         'enfermedadCronica': enfermedadCronica,
         'nivelComplejidad': nivelComplejidad,
+        'comentarios': comentarios,
       };
 
   factory Person.fromMap(String id, Map<String, dynamic> map) {
@@ -66,6 +69,7 @@ class Person {
       enfermedadMental: map['enfermedadMental'] as String? ?? '',
       enfermedadCronica: map['enfermedadCronica'] as String? ?? '',
       nivelComplejidad: (map['nivelComplejidad'] as num?)?.toInt() ?? 1,
+      comentarios: map['comentarios'] as String? ?? '',
     );
   }
 
@@ -84,6 +88,7 @@ class Person {
     String? enfermedadMental,
     String? enfermedadCronica,
     int? nivelComplejidad,
+    String? comentarios,
   }) {
     return Person(
       id: id ?? this.id,
@@ -101,6 +106,7 @@ class Person {
       enfermedadMental: enfermedadMental ?? this.enfermedadMental,
       enfermedadCronica: enfermedadCronica ?? this.enfermedadCronica,
       nivelComplejidad: nivelComplejidad ?? this.nivelComplejidad,
+      comentarios: comentarios ?? this.comentarios,
     );
   }
 }

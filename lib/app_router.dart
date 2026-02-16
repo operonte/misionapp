@@ -26,13 +26,6 @@ GoRouter createAppRouter() {
       GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
       GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
       GoRoute(
-        path: '/person/:id',
-        builder: (_, state) {
-          final id = state.pathParameters['id']!;
-          return PersonDetailScreen(personId: id);
-        },
-      ),
-      GoRoute(
         path: '/person/new',
         builder: (_, __) => const PersonFormScreen(),
       ),
@@ -41,6 +34,13 @@ GoRouter createAppRouter() {
         builder: (_, state) {
           final id = state.pathParameters['id']!;
           return PersonFormScreen(personId: id);
+        },
+      ),
+      GoRoute(
+        path: '/person/:id',
+        builder: (_, state) {
+          final id = state.pathParameters['id']!;
+          return PersonDetailScreen(personId: id);
         },
       ),
       GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
@@ -55,18 +55,21 @@ GoRouter createAppRouter() {
 
       if (location == '/splash') return null;
 
+      final onboardingDone = await appStorage.isOnboardingDone();
+      // Primera vez: mostrar onboarding antes de login.
+      if (!onboardingDone && location != '/onboarding') {
+        return '/onboarding';
+      }
+
       if (user == null) {
-        if (location != '/login') return '/login';
+        if (location != '/login' && location != '/onboarding') return '/login';
         return null;
       }
 
-      final onboardingDone = await appStorage.isOnboardingDone();
-      if (!onboardingDone && location != '/onboarding') {
-        if (location == '/login') return '/onboarding';
-        if (location != '/onboarding') return '/onboarding';
+      // Usuario logueado que viene del login → home.
+      if (onboardingDone && location == '/login') {
+        return '/home';
       }
-
-      if (location == '/login' || location == '/onboarding') return '/home';
       return null;
     },
   );

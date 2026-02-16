@@ -6,7 +6,6 @@ import '../models/person.dart';
 import '../models/visit.dart';
 import '../services/firestore_service.dart';
 import '../utils/visit_color.dart';
-import '../app_config.dart';
 
 class PersonDetailScreen extends StatelessWidget {
   final String personId;
@@ -82,6 +81,8 @@ class PersonDetailScreen extends StatelessWidget {
                 _row('Vicios', person.vicios.join(', ')),
                 _row('Enfermedad mental', person.enfermedadMental),
                 _row('Enfermedad crónica', person.enfermedadCronica),
+                if (person.comentarios.isNotEmpty)
+                  _row('Comentarios', person.comentarios),
                 const SizedBox(height: 8),
                 Row(
                   children: [

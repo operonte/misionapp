@@ -18,7 +18,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _finish() async {
     await appStorage.setOnboardingDone(true);
     if (!mounted) return;
-    context.go('/home');
+    context.go('/login');
   }
 
   @override

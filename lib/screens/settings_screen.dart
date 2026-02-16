@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../app_state.dart';
-import '../app_config.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/export_service.dart';
@@ -19,7 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loading = false;
   late TextEditingController _nombreController;
   late TextEditingController _apellidoController;
-  late String _grupo;
+  late TextEditingController _grupoController;
 
   @override
   void initState() {
@@ -27,13 +26,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final p = currentUserProfile;
     _nombreController = TextEditingController(text: p?.nombre ?? '');
     _apellidoController = TextEditingController(text: p?.apellido ?? '');
-    _grupo = p?.grupo ?? missionGroups.first;
+    _grupoController = TextEditingController(text: p?.grupo ?? '');
   }
 
   @override
   void dispose() {
     _nombreController.dispose();
     _apellidoController.dispose();
+    _grupoController.dispose();
     super.dispose();
   }
 
@@ -46,7 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final updated = profile.copyWith(
         nombre: _nombreController.text.trim(),
         apellido: _apellidoController.text.trim(),
-        grupo: _grupo,
+        grupo: _grupoController.text.trim(),
       );
       await _firestore.setUserProfile(updated);
       currentUserProfile = updated;
@@ -116,17 +116,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _grupo,
+                TextField(
+                  controller: _grupoController,
                   decoration: const InputDecoration(
-                    labelText: 'Grupo',
+                    labelText: 'Grupo de misión',
+                    hintText: 'Escribe el nombre de tu grupo',
                     border: OutlineInputBorder(),
                   ),
-                  items: missionGroups
-                      .map((o) =>
-                          DropdownMenuItem(value: o, child: Text(o)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _grupo = v ?? _grupo),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(

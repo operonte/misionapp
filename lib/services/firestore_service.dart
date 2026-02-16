@@ -86,7 +86,9 @@ class FirestoreService {
     final visitsRef =
         _firestore.collection(_personsCol).doc(personId).collection('visits');
     final visitsSnap = await visitsRef.get();
-    for (final d in visitsSnap.docs) batch.delete(d.reference);
+    for (final d in visitsSnap.docs) {
+      batch.delete(d.reference);
+    }
     batch.delete(_firestore.collection(_personsCol).doc(personId));
     await batch.commit();
   }
