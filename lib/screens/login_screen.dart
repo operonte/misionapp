@@ -33,11 +33,19 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('Error al entrar con Google: $e');
       debugPrint('$st');
       if (!mounted) return;
+      final String message = e.toString();
+      final bool isSignInFailed = message.toLowerCase().contains('sign in failed') ||
+          message.toLowerCase().contains('sign_in_failed') ||
+          message.toLowerCase().contains('platformexception');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
+          content: Text(
+            isSignInFailed
+                ? 'Error al iniciar sesión. Si instalaste la app desde Google Play, el desarrollador debe añadir el SHA-1 de Play en Firebase (ver docs/FIREBASE_PLAY_SHA1.md).'
+                : 'Error: $e',
+          ),
           backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 8),
           action: SnackBarAction(
             label: 'Cerrar',
             onPressed: () {},

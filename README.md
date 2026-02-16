@@ -22,6 +22,10 @@ El APK firmado también está en este repositorio: `release/misionapp-release-1.
 
 [operonte/releases](https://github.com/operonte/releases) — políticas, términos y enlaces centralizados para MisionApp, fasT y Horas Médicas.
 
+## Si falla "Entrar con Google" en la app de Play Store
+
+Si la app instalada desde Google Play muestra error al iniciar sesión, suele deberse a que falta el **SHA-1 del certificado de Play** en Firebase. Ver **[docs/FIREBASE_PLAY_SHA1.md](docs/FIREBASE_PLAY_SHA1.md)** para los pasos exactos.
+
 ## Desarrollo
 
 - Flutter 3.x
