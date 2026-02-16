@@ -1,16 +1,29 @@
-# misionapp
+# MisionApp
 
-A new Flutter project.
+App para que los misioneros registren personas y visitas, organizados por grupos. Acceso con cuenta Google; datos en Firestore.
 
-## Getting Started
+**Versión:** 1.0.0
 
-This project is a starting point for a Flutter application.
+## Política de Privacidad
 
-A few resources to get you started if this is your first Flutter project:
+[Ver política de privacidad](https://operonte.github.io/releases/misionapp/policies/privacy_policy.html)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Términos de uso
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+[Ver términos de uso](https://operonte.github.io/releases/misionapp/policies/terms_of_use.html)
+
+## Descargar APK
+
+**[Descargar última versión para Android (v1.0.0)](https://github.com/operonte/misionapp/releases/latest)**
+
+El APK firmado también está en este repositorio: `release/misionapp-release-1.0.0.apk`
+
+## Repositorio de políticas y enlaces
+
+[operonte/releases](https://github.com/operonte/releases) — políticas, términos y enlaces centralizados para MisionApp, fasT y Horas Médicas.
+
+## Desarrollo
+
+- Flutter 3.x
+- Firebase (Auth con Google, Firestore)
+- Paquete: `com.operonte.misionapp`

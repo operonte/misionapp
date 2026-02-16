@@ -1,0 +1,30 @@
+---
+description: Verificar acceso a servicios externos y permisos antes de compilar
+alwaysApply: true
+---
+
+# Verificar antes de asumir
+
+## Acceso a servicios externos (Firebase, GitHub, etc.)
+
+- **No afirmes que no tienes acceso** sin haberlo comprobado.
+- Antes de decir "no tengo acceso a Firebase/GitHub": ejecuta el comando o la acción (p. ej. `firebase projects:list`, `git push`, deploy). Si falla, entonces indica el error concreto.
+- Si el usuario dice que tienes acceso, intenta la operación; no des por hecho que no puedes.
+
+## Permisos de la app antes de compilar
+
+- Antes de **cualquier compilación** (debug o release) de una app Android/Flutter:
+  1. Revisar **AndroidManifest.xml** (main y debug): que esté declarado `INTERNET` en `src/main` si la app usa red (Firebase, APIs, WebView, correo).
+  2. Revisar que no falten permisos que la app vaya a usar (almacenamiento, cámara, etc.) según la funcionalidad.
+- Aplicar lo mismo a iOS/otros targets si aplica (Info.plist, etc.).
+
+## Repositorios GitHub
+
+- Al **crear** un repo en GitHub: **siempre privado**, salvo que el usuario pida explícitamente uno público.
+- Al **subir** un proyecto: incluir el proyecto **completo** (código, config, keys, keystores, google-services.json, release/ con APK/AAB si aplica), salvo que pida excluir algo.
+
+## Resumen
+
+1. **Servicios externos**: intentar la operación; solo decir "no hay acceso" si el intento falla.
+2. **Compilación**: revisar permisos en manifest(s) antes de ejecutar `flutter build` o `flutter run`.
+3. **GitHub**: crear repos en privado; subir proyecto completo (incl. archivos sensibles en repo privado si lo pide).
