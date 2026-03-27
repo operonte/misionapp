@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../app_state.dart';
+import '../app_config.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/group_validation_service.dart';
 import '../services/export_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -15,10 +17,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final FirestoreService _firestore = FirestoreService();
   final AuthService _auth = AuthService();
+  final GroupValidationService _groupValidation = GroupValidationService();
   bool _loading = false;
   late TextEditingController _nombreController;
   late TextEditingController _apellidoController;
   late TextEditingController _grupoController;
+  List<String> _allowedGroups = [];
+  String? _selectedGroup;
 
   @override
   void initState() {
@@ -27,6 +32,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _nombreController = TextEditingController(text: p?.nombre ?? '');
     _apellidoController = TextEditingController(text: p?.apellido ?? '');
     _grupoController = TextEditingController(text: p?.grupo ?? '');
+    _selectedGroup = p?.grupo;
+    _loadAllowedGroups();
   }
 
   @override
@@ -37,22 +44,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  Future<void> _loadAllowedGroups() async {
+    final groups = await _groupValidation.getAllAllowedGroups();
+    setState(() {
+      _allowedGroups = groups;
+      if (!_allowedGroups.contains(_selectedGroup) && _selectedGroup != null) {
+        _selectedGroup = _allowedGroups.first;
+      }
+    });
+  }
+
   Future<void> _saveProfile() async {
     final user = currentFirebaseUser;
     if (user == null) return;
+    
+    final grupoText = _grupoController.text.trim();
+    if (grupoText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debes escribir un grupo'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (!missionGroups.contains(grupoText.toUpperCase())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('escribiste mal el grupo'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       final profile = (currentUserProfile ?? await _firestore.getUserProfile(user.uid))!;
       final updated = profile.copyWith(
         nombre: _nombreController.text.trim(),
         apellido: _apellidoController.text.trim(),
-        grupo: _grupoController.text.trim(),
+        grupo: grupoText.toUpperCase(),
       );
-      await _firestore.setUserProfile(updated);
+      
+      await _auth.updateUserProfile(updated);
       currentUserProfile = updated;
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Perfil actualizado')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -120,7 +170,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   controller: _grupoController,
                   decoration: const InputDecoration(
                     labelText: 'Grupo de misión',
-                    hintText: 'Escribe el nombre de tu grupo',
+                    hintText: 'Escribe el nombre del grupo',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -145,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () => context.push('/contact'),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.privacy_tip_outlined),
+                  leading: const Icon(Icons.privacy_tip),
                   title: const Text('Política de privacidad'),
                   onTap: () => context.push('/privacy'),
                 ),
