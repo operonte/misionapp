@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../app_config.dart';
 import '../models/person.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
 
 class PersonFormScreen extends StatefulWidget {
   final String? personId;
@@ -17,6 +18,7 @@ class PersonFormScreen extends StatefulWidget {
 class _PersonFormScreenState extends State<PersonFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final FirestoreService _firestore = FirestoreService();
+  final NotificationService _notificationService = NotificationService();
   bool _loading = false;
   bool _isEdit = false;
 
@@ -49,12 +51,14 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
     esCristianoOAsisteIglesia = 'No';
     quiereRecibirVisitas = 'Sí';
     vicios = [];
-    enfermedadMental = mentalHealthOptions.first;
-    enfermedadCronica = chronicIllnessOptions.first;
+    enfermedadMental = 'No';
+    enfermedadCronica = 'No';
     nivelComplejidad = 1;
-    grupo = profile?.grupo ?? '';
+    grupo = profile?.grupo ?? 'JORGEALES';
     comentarios = '';
-    if (_isEdit) _loadPerson();
+    if (_isEdit) {
+      _loadPerson();
+    }
   }
 
   Future<void> _loadPerson() async {
@@ -89,7 +93,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
     try {
       final person = Person(
         id: widget.personId ?? '',
-        grupo: grupo.trim(),
+        grupo: grupo.trim().toUpperCase(),
         nombreApellidos: nombreApellidos.trim(),
         direccion: direccion.trim(),
         telefono: telefono.trim(),
@@ -106,8 +110,18 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
       );
       if (_isEdit) {
         await _firestore.updatePerson(person);
+        // Enviar notificación de actualización
+        await _notificationService.sendSimpleNotification(
+          '✏️ Persona actualizada',
+          '${person.nombreApellidos} ha sido actualizada',
+        );
       } else {
         await _firestore.addPerson(person);
+        // Enviar notificación de nuevo registro
+        await _notificationService.sendSimpleNotification(
+          '👤 Nueva persona agregada',
+          '${person.nombreApellidos} ha sido registrada',
+        );
       }
       if (mounted) {
         if (_isEdit) {
@@ -294,8 +308,15 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                       border: OutlineInputBorder(),
                     ),
                     onChanged: (v) => grupo = v,
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Requerido';
+                      }
+                      if (!missionGroups.contains(v.trim().toUpperCase())) {
+                        return 'escribiste mal el grupo';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
