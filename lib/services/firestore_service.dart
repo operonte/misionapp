@@ -4,23 +4,30 @@ import '../models/user_profile.dart';
 import '../models/person.dart';
 import '../models/visit.dart';
 
-/// ID de la base Firestore que creaste (plan Blaze). No usar "(default)".
 const String _databaseId = 'misionapp';
 
 class FirestoreService {
-  late final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(
-    app: Firebase.app(),
-    databaseId: _databaseId,
-  );
+  static FirestoreService? _instance;
 
-  FirestoreService() {
+  factory FirestoreService() {
+    _instance ??= FirestoreService._internal();
+    return _instance!;
+  }
+
+  FirestoreService._internal() {
     _firestore.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
   }
 
-  // ---------- User profile ----------
+  late final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(
+    app: Firebase.app(),
+    databaseId: _databaseId,
+  );
+
+  // ── User profile ───────────────────────────────────────────────────────────
+
   static const String _usersCol = 'users';
 
   Future<UserProfile?> getUserProfile(String uid) async {
@@ -40,19 +47,35 @@ class FirestoreService {
     });
   }
 
-  // ---------- Persons ----------
+  // ── Persons ────────────────────────────────────────────────────────────────
+
   static const String _personsCol = 'persons';
 
-  /// Lista personas visibles para el usuario: su grupo o todas si es ADMINISTRADOR.
+  /// Forces a server-side fetch, updating the local cache so the live
+  /// [personsStream] emits fresh data after a pull-to-refresh.
+  Future<void> refreshPersons(String userGrupo) async {
+    try {
+      if (userGrupo == 'ADMINISTRADOR') {
+        await _firestore
+            .collection(_personsCol)
+            .get(const GetOptions(source: Source.server));
+      } else {
+        await _firestore
+            .collection(_personsCol)
+            .where('grupo', isEqualTo: userGrupo)
+            .get(const GetOptions(source: Source.server));
+      }
+    } catch (_) {} // fail silently when offline
+  }
+
   Stream<List<Person>> personsStream(String userGrupo) {
     if (userGrupo == 'ADMINISTRADOR') {
       return _firestore
           .collection(_personsCol)
           .orderBy('nombreApellidos')
           .snapshots()
-          .map((snap) => snap.docs
-              .map((d) => Person.fromMap(d.id, d.data()))
-              .toList());
+          .map((snap) =>
+              snap.docs.map((d) => Person.fromMap(d.id, d.data())).toList());
     }
     return _firestore
         .collection(_personsCol)
@@ -63,22 +86,48 @@ class FirestoreService {
             snap.docs.map((d) => Person.fromMap(d.id, d.data())).toList());
   }
 
+  /// Real-time stream for a single person document. Used in PersonDetailScreen
+  /// to avoid stale data after edits made from another session.
+  Stream<Person?> personStream(String personId) {
+    return _firestore
+        .collection(_personsCol)
+        .doc(personId)
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists || doc.data() == null) return null;
+      return Person.fromMap(doc.id, doc.data()!);
+    });
+  }
+
   Future<Person?> getPerson(String personId) async {
     final doc = await _firestore.collection(_personsCol).doc(personId).get();
     if (doc.data() == null) return null;
     return Person.fromMap(doc.id, doc.data()!);
   }
 
-  Future<String> addPerson(Person person) async {
-    final ref = await _firestore.collection(_personsCol).add(person.toMap());
+  Future<String> addPerson(Person person, {String? createdBy}) async {
+    final map = person.toMap();
+    if (createdBy != null && createdBy.isNotEmpty) {
+      final now = FieldValue.serverTimestamp();
+      map['creadoPor'] = createdBy;
+      map['creadoEn'] = now;
+      map['modificadoPor'] = createdBy;
+      map['fechaModificacion'] = now;
+    }
+    final ref = await _firestore.collection(_personsCol).add(map);
     return ref.id;
   }
 
-  Future<void> updatePerson(Person person) async {
+  Future<void> updatePerson(Person person, {String? modifiedBy}) async {
+    final map = person.toMap();
+    if (modifiedBy != null && modifiedBy.isNotEmpty) {
+      map['modificadoPor'] = modifiedBy;
+      map['fechaModificacion'] = FieldValue.serverTimestamp();
+    }
     await _firestore
         .collection(_personsCol)
         .doc(person.id)
-        .update(person.toMap());
+        .update(map);
   }
 
   Future<void> deletePerson(String personId) async {
@@ -93,7 +142,8 @@ class FirestoreService {
     await batch.commit();
   }
 
-  // ---------- Visits (subcollection) ----------
+  // ── Visits (sub-collection) ────────────────────────────────────────────────
+
   Stream<List<Visit>> visitsStream(String personId) {
     return _firestore
         .collection(_personsCol)
@@ -101,9 +151,8 @@ class FirestoreService {
         .collection('visits')
         .orderBy('fecha', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => Visit.fromMap(d.id, d.data()))
-            .toList());
+        .map((snap) =>
+            snap.docs.map((d) => Visit.fromMap(d.id, d.data())).toList());
   }
 
   Future<DateTime?> getLastVisitDate(String personId) async {
@@ -125,12 +174,38 @@ class FirestoreService {
         .doc(personId)
         .collection('visits')
         .add(visit.toMap());
+    // Denormalize: update last-visit date and increment visit counter atomically.
+    await _firestore.collection(_personsCol).doc(personId).update({
+      'ultimaVisita': Timestamp.fromDate(visit.fecha),
+      'totalVisitas': FieldValue.increment(1),
+    });
   }
 
-  // ---------- Export (admin): all persons with visits ----------
+  /// Deletes a visit and keeps ultimaVisita + totalVisitas consistent.
+  Future<void> deleteVisit(String personId, String visitId) async {
+    await _firestore
+        .collection(_personsCol)
+        .doc(personId)
+        .collection('visits')
+        .doc(visitId)
+        .delete();
+
+    // Recalculate ultimaVisita in case we just removed the most recent visit.
+    final newLast = await getLastVisitDate(personId);
+    await _firestore.collection(_personsCol).doc(personId).update({
+      'ultimaVisita':
+          newLast != null ? Timestamp.fromDate(newLast) : FieldValue.delete(),
+      'totalVisitas': FieldValue.increment(-1),
+    });
+  }
+
+  // ── Export (admin) ─────────────────────────────────────────────────────────
+
   Future<List<Person>> getAllPersonsForExport() async {
-    final snap =
-        await _firestore.collection(_personsCol).orderBy('nombreApellidos').get();
+    final snap = await _firestore
+        .collection(_personsCol)
+        .orderBy('nombreApellidos')
+        .get();
     return snap.docs.map((d) => Person.fromMap(d.id, d.data())).toList();
   }
 

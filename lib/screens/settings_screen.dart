@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../app_state.dart';
 import '../app_config.dart';
+import '../app_themes.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/group_validation_service.dart';
 import '../services/export_service.dart';
+import '../utils/app_error.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,12 +19,10 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final FirestoreService _firestore = FirestoreService();
   final AuthService _auth = AuthService();
-  final GroupValidationService _groupValidation = GroupValidationService();
   bool _loading = false;
   late TextEditingController _nombreController;
   late TextEditingController _apellidoController;
-  late TextEditingController _grupoController;
-  List<String> _allowedGroups = [];
+  List<String> _allowedGroups = missionGroups; // fast path: local list
   String? _selectedGroup;
 
   @override
@@ -31,7 +31,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final p = currentUserProfile;
     _nombreController = TextEditingController(text: p?.nombre ?? '');
     _apellidoController = TextEditingController(text: p?.apellido ?? '');
-    _grupoController = TextEditingController(text: p?.grupo ?? '');
     _selectedGroup = p?.grupo;
     _loadAllowedGroups();
   }
@@ -40,68 +39,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _nombreController.dispose();
     _apellidoController.dispose();
-    _grupoController.dispose();
     super.dispose();
   }
 
   Future<void> _loadAllowedGroups() async {
-    final groups = await _groupValidation.getAllAllowedGroups();
-    setState(() {
-      _allowedGroups = groups;
-      if (!_allowedGroups.contains(_selectedGroup) && _selectedGroup != null) {
-        _selectedGroup = _allowedGroups.first;
+    try {
+      final groups = await GroupValidationService().getAllAllowedGroups();
+      if (mounted && groups.isNotEmpty) {
+        setState(() {
+          _allowedGroups = groups;
+          if (_selectedGroup != null &&
+              !_allowedGroups.contains(_selectedGroup)) {
+            _selectedGroup = _allowedGroups.first;
+          }
+        });
       }
-    });
+    } catch (_) {
+      // Keep using local missionGroups.
+    }
   }
 
   Future<void> _saveProfile() async {
     final user = currentFirebaseUser;
     if (user == null) return;
-    
-    final grupoText = _grupoController.text.trim();
-    if (grupoText.isEmpty) {
+
+    final nombre = _nombreController.text.trim();
+    if (nombre.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Debes escribir un grupo'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('El nombre es requerido')),
       );
       return;
     }
-    
-    if (!missionGroups.contains(grupoText.toUpperCase())) {
+    if (_selectedGroup == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('escribiste mal el grupo'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Selecciona un grupo')),
       );
       return;
     }
 
     setState(() => _loading = true);
     try {
-      final profile = (currentUserProfile ?? await _firestore.getUserProfile(user.uid))!;
+      final profile =
+          (currentUserProfile ?? await _firestore.getUserProfile(user.uid))!;
       final updated = profile.copyWith(
-        nombre: _nombreController.text.trim(),
+        nombre: nombre,
         apellido: _apellidoController.text.trim(),
-        grupo: grupoText.toUpperCase(),
+        grupo: _selectedGroup!,
       );
-      
+
       await _auth.updateUserProfile(updated);
       currentUserProfile = updated;
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Perfil actualizado')),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugLog('Error al guardar perfil', e, st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            content: Text(friendlyError(e)),
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -114,13 +114,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _loading = true);
     try {
       final path = await ExportService().exportToExcel(_firestore);
-      if (mounted && path != null) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Exportado: $path')),
+          SnackBar(
+            content: Text(
+                path != null ? 'Exportado correctamente' : 'No hay datos para exportar'),
+          ),
         );
-      } else if (mounted) {
+      }
+    } catch (e, st) {
+      debugLog('Error al exportar', e, st);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al exportar')),
+          SnackBar(
+            content: Text(friendlyError(e)),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -147,8 +156,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 const Text('Tu perfil',
-                    style:
-                        TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _nombreController,
@@ -156,6 +165,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     labelText: 'Nombre',
                     border: OutlineInputBorder(),
                   ),
+                  maxLength: 50,
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -164,15 +174,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     labelText: 'Apellido',
                     border: OutlineInputBorder(),
                   ),
+                  maxLength: 50,
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _grupoController,
+                DropdownButtonFormField<String>(
+                  value: _allowedGroups.contains(_selectedGroup)
+                      ? _selectedGroup
+                      : null,
                   decoration: const InputDecoration(
                     labelText: 'Grupo de misión',
-                    hintText: 'Escribe el nombre del grupo',
                     border: OutlineInputBorder(),
                   ),
+                  items: _allowedGroups
+                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedGroup = v),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
@@ -180,9 +196,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: const Text('Guardar perfil'),
                 ),
                 const SizedBox(height: 32),
+                const Text('Apariencia',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                const _ThemePicker(),
+                const SizedBox(height: 32),
                 const Text('Información',
-                    style:
-                        TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 ListTile(
                   leading: const Icon(Icons.info_outline),
@@ -211,6 +233,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           fontSize: 14, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   ListTile(
+                    leading: const Icon(Icons.bar_chart_outlined),
+                    title: const Text('Estadísticas'),
+                    onTap: () => context.push('/stats'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.table_chart_outlined),
                     title: const Text('Exportar a Excel'),
                     onTap: _exportExcel,
@@ -221,6 +248,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.logout),
                   title: const Text('Cerrar sesión'),
                   onTap: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Cerrar sesión'),
+                        content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancelar'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Cerrar sesión'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true) return;
                     await _auth.signOut();
                     currentUserProfile = null;
                     if (context.mounted) context.go('/login');
@@ -228,6 +273,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// Muestra los 4 círculos de paleta. Actualiza el tema en tiempo real.
+class _ThemePicker extends StatelessWidget {
+  const _ThemePicker();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: themeIndexNotifier,
+      builder: (context, current, _) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: List.generate(appPalettes.length, (i) {
+            final palette = appPalettes[i];
+            final selected = i == current;
+            return Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: GestureDetector(
+                onTap: () async {
+                  themeIndexNotifier.value = i;
+                  await appStorage.setThemeIndex(i);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: palette.seed,
+                        shape: BoxShape.circle,
+                        border: selected
+                            ? Border.all(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                width: 3,
+                              )
+                            : Border.all(color: Colors.transparent, width: 3),
+                        boxShadow: selected
+                            ? [
+                                BoxShadow(
+                                  color: palette.seed.withValues(alpha: 0.45),
+                                  blurRadius: 10,
+                                  spreadRadius: 2,
+                                )
+                              ]
+                            : null,
+                      ),
+                      child: selected
+                          ? const Icon(Icons.check,
+                              color: Colors.white, size: 22)
+                          : null,
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      palette.name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: selected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

@@ -4,7 +4,9 @@ import '../app_state.dart';
 import '../app_config.dart';
 import '../models/person.dart';
 import '../services/firestore_service.dart';
+import '../services/group_validation_service.dart';
 import '../services/notification_service.dart';
+import '../utils/app_error.dart';
 
 class PersonFormScreen extends StatefulWidget {
   final String? personId;
@@ -21,6 +23,9 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
   final NotificationService _notificationService = NotificationService();
   bool _loading = false;
   bool _isEdit = false;
+
+  // Campo grupo: cargado dinámicamente desde Firestore (con fast-path local).
+  List<String> _availableGroups = [];
 
   late String nombreApellidos;
   late String direccion;
@@ -42,6 +47,8 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
     super.initState();
     _isEdit = widget.personId != null;
     final profile = currentUserProfile;
+    final isAdmin = profile?.isAdmin ?? false;
+
     nombreApellidos = '';
     direccion = '';
     telefono = '';
@@ -51,13 +58,35 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
     esCristianoOAsisteIglesia = 'No';
     quiereRecibirVisitas = 'Sí';
     vicios = [];
-    enfermedadMental = 'No';
-    enfermedadCronica = 'No';
+    enfermedadMental = mentalHealthOptions.first;
+    enfermedadCronica = chronicIllnessOptions.first;
     nivelComplejidad = 1;
-    grupo = profile?.grupo ?? 'JORGEALES';
+    grupo = profile?.grupo ?? missionGroups.first;
     comentarios = '';
-    if (_isEdit) {
-      _loadPerson();
+
+    // Fast path: use local config immediately so dropdown is ready.
+    _availableGroups = isAdmin
+        ? missionGroups.where((g) => g != 'ADMINISTRADOR').toList()
+        : [profile?.grupo ?? missionGroups.first];
+
+    _loadGroupsFromFirestore();
+    if (_isEdit) _loadPerson();
+  }
+
+  Future<void> _loadGroupsFromFirestore() async {
+    final profile = currentUserProfile;
+    if (!(profile?.isAdmin ?? false)) return; // non-admin: local fast path is enough
+    try {
+      final all = await GroupValidationService().getAllAllowedGroups();
+      final groups = all.where((g) => g != 'ADMINISTRADOR').toList();
+      if (mounted && groups.isNotEmpty) {
+        setState(() {
+          _availableGroups = groups;
+          if (!groups.contains(grupo)) grupo = groups.first;
+        });
+      }
+    } catch (_) {
+      // Keep using local missionGroups on network error.
     }
   }
 
@@ -108,18 +137,18 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
         nivelComplejidad: nivelComplejidad,
         comentarios: comentarios.trim(),
       );
+      final auditName = currentUserProfile?.displayName ??
+          currentFirebaseUser?.email ?? '';
       if (_isEdit) {
-        await _firestore.updatePerson(person);
-        // Enviar notificación de actualización
+        await _firestore.updatePerson(person, modifiedBy: auditName);
         await _notificationService.sendSimpleNotification(
-          '✏️ Persona actualizada',
+          'Persona actualizada',
           '${person.nombreApellidos} ha sido actualizada',
         );
       } else {
-        await _firestore.addPerson(person);
-        // Enviar notificación de nuevo registro
+        await _firestore.addPerson(person, createdBy: auditName);
         await _notificationService.sendSimpleNotification(
-          '👤 Nueva persona agregada',
+          'Nueva persona agregada',
           '${person.nombreApellidos} ha sido registrada',
         );
       }
@@ -134,12 +163,11 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
         );
       }
     } catch (e, st) {
-      debugPrint('Error al guardar persona: $e');
-      debugPrint('$st');
+      debugLog('Error al guardar persona', e, st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al guardar: $e'),
+            content: Text(friendlyError(e)),
             backgroundColor: Theme.of(context).colorScheme.error,
             duration: const Duration(seconds: 5),
           ),
@@ -173,6 +201,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                       labelText: 'Nombre y apellidos',
                       border: OutlineInputBorder(),
                     ),
+                    maxLength: 100,
                     onChanged: (v) => nombreApellidos = v,
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Requerido' : null,
@@ -182,6 +211,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                     initialValue: direccion,
                     decoration: const InputDecoration(
                         labelText: 'Dirección', border: OutlineInputBorder()),
+                    maxLength: 200,
                     onChanged: (v) => direccion = v,
                   ),
                   const SizedBox(height: 12),
@@ -190,6 +220,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                     decoration: const InputDecoration(
                         labelText: 'Teléfono', border: OutlineInputBorder()),
                     keyboardType: TextInputType.phone,
+                    maxLength: 20,
                     onChanged: (v) => telefono = v,
                   ),
                   const SizedBox(height: 12),
@@ -198,7 +229,16 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                     decoration: const InputDecoration(
                         labelText: 'Edad', border: OutlineInputBorder()),
                     keyboardType: TextInputType.number,
+                    maxLength: 3,
                     onChanged: (v) => edad = v,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final n = int.tryParse(v.trim());
+                      if (n == null || n < 1 || n > 120) {
+                        return 'Edad inválida (1–120)';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -217,6 +257,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                       labelText: 'A qué se dedica',
                       border: OutlineInputBorder(),
                     ),
+                    maxLength: 150,
                     onChanged: (v) => aQueSeDedica = v,
                   ),
                   const SizedBox(height: 12),
@@ -300,23 +341,26 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    initialValue: grupo,
+                  // Grupo: dropdown con grupos válidos. Non-admin users see only
+                  // their own group (enforced also by Firestore rules — OWASP A01).
+                  DropdownButtonFormField<String>(
+                    value: _availableGroups.contains(grupo)
+                        ? grupo
+                        : (_availableGroups.isNotEmpty
+                            ? _availableGroups.first
+                            : null),
                     decoration: const InputDecoration(
                       labelText: 'Grupo de misión',
-                      hintText: 'Escribe el nombre del grupo',
                       border: OutlineInputBorder(),
                     ),
-                    onChanged: (v) => grupo = v,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Requerido';
-                      }
-                      if (!missionGroups.contains(v.trim().toUpperCase())) {
-                        return 'escribiste mal el grupo';
-                      }
-                      return null;
-                    },
+                    items: _availableGroups
+                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                        .toList(),
+                    onChanged: _availableGroups.length > 1
+                        ? (v) => setState(() => grupo = v ?? grupo)
+                        : null, // single-item: show but disable editing
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -328,6 +372,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                       alignLabelWithHint: true,
                     ),
                     maxLines: 4,
+                    maxLength: 1000,
                     onChanged: (v) => comentarios = v,
                   ),
                   const SizedBox(height: 24),

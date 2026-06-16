@@ -21,9 +21,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _resolve() async {
-    await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
-    final onboardingDone = await appStorage.isOnboardingDone();
+    final onboardingDone = appStorage.isOnboardingDone();
     if (!mounted) return;
     // Primera vez: mostrar las 5 pantallas de bienvenida antes de login.
     if (!onboardingDone) {

@@ -35,6 +35,10 @@ class AuthService {
     await _auth.signOut();
   }
 
+  Future<void> updateUserProfile(UserProfile profile) async {
+    await _firestore.setUserProfile(profile);
+  }
+
   /// Crea o actualiza perfil con nombre por defecto desde Google.
   Future<UserProfile> ensureUserProfile(User user) async {
     final existing = await _firestore.getUserProfile(user.uid);

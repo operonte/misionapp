@@ -2,23 +2,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Solo el usuario autenticado puede leer y escribir su propio perfil.
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Personas: cualquier autenticado puede leer, crear y actualizar.
-    // Solo ADMINISTRADOR puede eliminar (se verifica grupo en /users/{uid}).
-    match /persons/{personId} {
-      allow read, create, update: if request.auth != null;
-      allow delete: if request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.grupo == 'ADMINISTRADOR';
+    // Reads the requesting user's profile doc once (billed as one read per
+    // rule evaluation). Calling this function twice in the same rule does NOT
+    // cause two reads — Firestore caches it within the evaluation.
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
 
-      // Visitas (subcolección): mismo criterio que personas.
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userGroup() {
+      return userDoc().data.grupo;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && userExists() && userGroup() == 'ADMINISTRADOR';
+    }
+
+    // ── User profiles ─────────────────────────────────────────────────────────
+    // Each user can only read and write their own profile document (OWASP A01).
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ── Persons ───────────────────────────────────────────────────────────────
+    match /persons/{personId} {
+
+      // READ: authenticated users see only persons in their own group.
+      // Admin sees all (no group filter applied in the rule).
+      // The Firestore query in personsStream already filters by grupo — this
+      // rule prevents direct reads of out-of-group documents (OWASP A01).
+      allow read: if isAuthenticated()
+        && (isAdmin() || (userExists() && resource.data.grupo == userGroup()));
+
+      // CREATE: non-admin users can only create persons in their own group.
+      // This prevents cross-group data insertion from a tampered client (OWASP A01).
+      allow create: if isAuthenticated()
+        && userExists()
+        && (isAdmin() || request.resource.data.grupo == userGroup());
+
+      // UPDATE: non-admin can only update persons that belong to their group.
+      // They also cannot move a person to a different group.
+      allow update: if isAuthenticated()
+        && userExists()
+        && (isAdmin()
+            || (resource.data.grupo == userGroup()
+                && request.resource.data.grupo == userGroup()));
+
+      // DELETE: admin only.
+      allow delete: if isAdmin();
+
+      // ── Visits (sub-collection) ──────────────────────────────────────────────
+      // Write access is restricted to users who belong to the same group as the
+      // parent person, preventing cross-group visit injection (OWASP A01).
       match /visits/{visitId} {
-        allow read, write: if request.auth != null;
+        allow read: if isAuthenticated()
+          && (isAdmin() || (userExists()
+              && get(/databases/$(database)/documents/persons/$(personId)).data.grupo == userGroup()));
+
+        allow write: if isAuthenticated()
+          && userExists()
+          && (isAdmin()
+              || get(/databases/$(database)/documents/persons/$(personId)).data.grupo == userGroup());
       }
+    }
+
+    // ── Config (allowed_groups, etc.) ─────────────────────────────────────────
+    // Any authenticated user can read config (e.g., to populate group dropdowns).
+    // Only admins can write config documents (OWASP A01 + A05).
+    match /config/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }

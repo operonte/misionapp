@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../app_state.dart';
+import '../utils/app_error.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,19 +31,18 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e, st) {
       if (!mounted) return;
       setState(() => _loading = false);
-      debugPrint('Error al entrar con Google: $e');
-      debugPrint('$st');
+      debugLog('Error al entrar con Google', e, st);
       if (!mounted) return;
-      final String message = e.toString();
-      final bool isSignInFailed = message.toLowerCase().contains('sign in failed') ||
-          message.toLowerCase().contains('sign_in_failed') ||
-          message.toLowerCase().contains('platformexception');
+      final String message = e.toString().toLowerCase();
+      final bool isSignInFailed = message.contains('sign in failed') ||
+          message.contains('sign_in_failed') ||
+          message.contains('platformexception');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isSignInFailed
                 ? 'Error al iniciar sesión. Si instalaste la app desde Google Play, el desarrollador debe añadir el SHA-1 de Play en Firebase (ver docs/FIREBASE_PLAY_SHA1.md).'
-                : 'Error: $e',
+                : friendlyError(e),
           ),
           backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 8),

@@ -13,6 +13,7 @@ import 'screens/about_screen.dart';
 import 'screens/contact_screen.dart';
 import 'screens/privacy_screen.dart';
 import 'screens/terms_screen.dart';
+import 'screens/stats_screen.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -44,6 +45,7 @@ GoRouter createAppRouter() {
         },
       ),
       GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/stats', builder: (_, __) => const StatsScreen()),
       GoRoute(path: '/about', builder: (_, __) => const AboutScreen()),
       GoRoute(path: '/contact', builder: (_, __) => const ContactScreen()),
       GoRoute(path: '/privacy', builder: (_, __) => const PrivacyScreen()),
@@ -55,7 +57,7 @@ GoRouter createAppRouter() {
 
       if (location == '/splash') return null;
 
-      final onboardingDone = await appStorage.isOnboardingDone();
+      final onboardingDone = appStorage.isOnboardingDone();
       // Primera vez: mostrar onboarding antes de login.
       if (!onboardingDone && location != '/onboarding') {
         return '/onboarding';
