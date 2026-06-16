@@ -22,8 +22,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loading = false;
   late TextEditingController _nombreController;
   late TextEditingController _apellidoController;
-  List<String> _allowedGroups = missionGroups; // fast path: local list
+  // Admin: dropdown with all groups.
+  List<String> _allowedGroups = missionGroups;
   String? _selectedGroup;
+  // Non-admin: free text field (doesn't expose group list).
+  late TextEditingController _grupoController;
 
   @override
   void initState() {
@@ -31,14 +34,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final p = currentUserProfile;
     _nombreController = TextEditingController(text: p?.nombre ?? '');
     _apellidoController = TextEditingController(text: p?.apellido ?? '');
+    _grupoController = TextEditingController(text: p?.grupo ?? '');
     _selectedGroup = p?.grupo;
-    _loadAllowedGroups();
+    // Only load group list for admin — non-admin uses a text field.
+    if (p?.isAdmin ?? false) _loadAllowedGroups();
   }
 
   @override
   void dispose() {
     _nombreController.dispose();
     _apellidoController.dispose();
+    _grupoController.dispose();
     super.dispose();
   }
 
@@ -70,11 +76,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       return;
     }
-    if (_selectedGroup == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona un grupo')),
-      );
-      return;
+    final isAdmin = currentUserProfile?.isAdmin ?? false;
+    String grupoFinal;
+    if (isAdmin) {
+      if (_selectedGroup == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selecciona un grupo')),
+        );
+        return;
+      }
+      grupoFinal = _selectedGroup!;
+    } else {
+      final typed = _grupoController.text.trim().toUpperCase();
+      if (typed.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('El grupo es requerido')),
+        );
+        return;
+      }
+      final valid = await GroupValidationService().validateGroupName(typed);
+      if (!valid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Grupo no reconocido. Verifica el nombre con tu líder.')),
+          );
+        }
+        return;
+      }
+      grupoFinal = typed;
     }
 
     setState(() => _loading = true);
@@ -84,7 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final updated = profile.copyWith(
         nombre: nombre,
         apellido: _apellidoController.text.trim(),
-        grupo: _selectedGroup!,
+        grupo: grupoFinal,
       );
 
       await _auth.updateUserProfile(updated);
@@ -177,19 +208,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   maxLength: 50,
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _allowedGroups.contains(_selectedGroup)
-                      ? _selectedGroup
-                      : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Grupo de misión',
-                    border: OutlineInputBorder(),
+                if (isAdmin)
+                  DropdownButtonFormField<String>(
+                    value: _allowedGroups.contains(_selectedGroup)
+                        ? _selectedGroup
+                        : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Grupo de misión',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _allowedGroups
+                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedGroup = v),
+                  )
+                else
+                  TextField(
+                    controller: _grupoController,
+                    decoration: const InputDecoration(
+                      labelText: 'Grupo de misión',
+                      hintText: 'Ingresa el nombre de tu grupo',
+                      border: OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                    maxLength: 50,
                   ),
-                  items: _allowedGroups
-                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedGroup = v),
-                ),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: _saveProfile,

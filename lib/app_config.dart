@@ -1,8 +1,8 @@
-/// URLs de políticas en repo releases (GitHub Pages).
+/// URLs de políticas alojadas en Firebase Hosting.
 const String privacyPolicyUrl =
-    'https://operonte.github.io/releases/misionapp/policies/privacy_policy.html';
+    'https://misionapp-f4d93.web.app/privacy.html';
 const String termsOfUseUrl =
-    'https://operonte.github.io/releases/misionapp/policies/terms_of_use.html';
+    'https://misionapp-f4d93.web.app/terms.html';
 
 /// Email de contacto.
 const String contactEmail = 'cristian.bravo.droguett@gmail.com';

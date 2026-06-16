@@ -16,8 +16,10 @@ class AppPalette {
 
   ThemeData darkTheme() => _buildTheme(Brightness.dark);
 
+  // Light palettes always show light — don't follow system dark mode.
+  // Use "Tech Oscuro" if you want a dark theme.
   ThemeMode get themeMode =>
-      forceDark ? ThemeMode.dark : ThemeMode.system;
+      forceDark ? ThemeMode.dark : ThemeMode.light;
 
   ThemeData _buildTheme(Brightness brightness) {
     // Step 1 — generate the M3 colour scheme from the seed colour.

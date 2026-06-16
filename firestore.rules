@@ -28,9 +28,21 @@ service cloud.firestore {
     }
 
     // ── User profiles ─────────────────────────────────────────────────────────
-    // Each user can only read and write their own profile document (OWASP A01).
+    // Users can read/update their own profile but cannot change the 'grupo'
+    // field — only an admin can reassign groups (OWASP A01).
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      // Create: allowed when the doc doesn't exist yet (first sign-in).
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+
+      // Update: user can edit name/apellido but NOT grupo.
+      // Admin can change anything (including grupo assignment).
+      allow update: if isAuthenticated()
+        && (isAdmin()
+            || (request.auth.uid == userId
+                && !request.resource.data.diff(resource.data)
+                    .affectedKeys().hasAny(['grupo'])));
     }
 
     // ── Persons ───────────────────────────────────────────────────────────────

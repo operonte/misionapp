@@ -341,27 +341,37 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Grupo: dropdown con grupos válidos. Non-admin users see only
-                  // their own group (enforced also by Firestore rules — OWASP A01).
-                  DropdownButtonFormField<String>(
-                    value: _availableGroups.contains(grupo)
-                        ? grupo
-                        : (_availableGroups.isNotEmpty
-                            ? _availableGroups.first
-                            : null),
-                    decoration: const InputDecoration(
-                      labelText: 'Grupo de misión',
-                      border: OutlineInputBorder(),
+                  // Admin: dropdown con todos los grupos.
+                  // No-admin: texto de solo lectura (no expone lista de grupos).
+                  if (currentUserProfile?.isAdmin ?? false)
+                    DropdownButtonFormField<String>(
+                      value: _availableGroups.contains(grupo)
+                          ? grupo
+                          : (_availableGroups.isNotEmpty
+                              ? _availableGroups.first
+                              : null),
+                      decoration: const InputDecoration(
+                        labelText: 'Grupo de misión',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _availableGroups
+                          .map(
+                              (g) => DropdownMenuItem(value: g, child: Text(g)))
+                          .toList(),
+                      onChanged: (v) => setState(() => grupo = v ?? grupo),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                    )
+                  else
+                    TextFormField(
+                      initialValue: grupo,
+                      decoration: const InputDecoration(
+                        labelText: 'Grupo de misión',
+                        border: OutlineInputBorder(),
+                      ),
+                      readOnly: true,
+                      enabled: false,
                     ),
-                    items: _availableGroups
-                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                        .toList(),
-                    onChanged: _availableGroups.length > 1
-                        ? (v) => setState(() => grupo = v ?? grupo)
-                        : null, // single-item: show but disable editing
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-                  ),
                   const SizedBox(height: 12),
                   TextFormField(
                     initialValue: comentarios,
