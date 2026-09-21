@@ -4,6 +4,22 @@ App para que los misioneros registren personas y visitas, organizados por grupos
 
 **Versión:** 1.0.0
 
+## Qué hace
+
+- Registra **personas y visitas**, con fecha y contenido de cada visita, organizadas por **grupos de misión**.
+- Busca por nombre o dirección; ordena por nombre, última visita o complejidad (1–7).
+- Filtra quién quiere recibir visitas y quién lleva más de 30 o 60 días sin ellas.
+- Para administradores: **estadísticas** y **exportación a Excel**.
+- Ingreso con Google, cuatro temas de color (uno oscuro) y, sin internet, muestra los últimos datos guardados.
+
+<p>
+  <img src="presentacion/capturas/01.png" alt="Lista de personas" width="180">
+  <img src="presentacion/capturas/02.png" alt="Tema oscuro" width="180">
+  <img src="presentacion/capturas/03.png" alt="Ajustes" width="180">
+</p>
+
+Ficha con más detalle: [presentacion/misionapp-folleto.pdf](presentacion/misionapp-folleto.pdf).
+
 ## Política de Privacidad
 
 [Ver política de privacidad](https://operonte.github.io/releases/misionapp/policies/privacy_policy.html)
